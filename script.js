@@ -65,8 +65,8 @@ async function loadData() {
     buildDefaultNav();
     displayData();
   } catch (error) {
-    console.error('Error loading data_01.json:', error);
-    alert('Failed to load lesson data. Please check that data_01.json exists.');
+    console.error('Error loading intro_ls0_unit_1_audio.json:', error);
+    alert('Failed to load lesson data. Please check that intro_ls0_unit_1_audio.json exists.');
   }
 }
 
