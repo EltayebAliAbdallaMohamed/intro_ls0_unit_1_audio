@@ -47,10 +47,6 @@ const nextBtn = document.getElementById("next");
 
 const speakingIndicator = document.getElementById("speakingIndicator");
 
-// Mobile Playlist Filter Elements
-let mobilePlaylistInput = null;
-let mobilePlaylistSuggestions = null;
-
 // ========== LOAD DATA FROM JSON ==========
 async function loadData() {
   try {
@@ -68,164 +64,10 @@ async function loadData() {
     Sentences = data.sentences;
     buildDefaultNav();
     displayData();
-    initializeMobilePlaylistFilter();
   } catch (error) {
     console.error('Error loading data_01.json:', error);
     alert('Failed to load lesson data. Please check that data_01.json exists.');
   }
-}
-
-// ========== MOBILE PLAYLIST FILTER ==========
-function initializeMobilePlaylistFilter() {
-  // Check if mobile filter already exists
-  if (mobilePlaylistInput) return;
-
-  // Create mobile filter container
-  const filterContainer = document.createElement("div");
-  filterContainer.id = "mobilePlaylistFilter";
-  filterContainer.style.cssText = `
-    display: none;
-    padding: 12px;
-    background: #f5f5f5;
-    border-radius: 8px;
-    margin-bottom: 12px;
-  `;
-
-  // Create input field
-  mobilePlaylistInput = document.createElement("input");
-  mobilePlaylistInput.type = "text";
-  mobilePlaylistInput.placeholder = "Type word/numbers (e.g., 'hello' or '1,3,5' or '1-5')";
-  mobilePlaylistInput.style.cssText = `
-    width: 100%;
-    padding: 10px;
-    border: 2px solid #ddd;
-    border-radius: 4px;
-    font-size: 16px;
-    box-sizing: border-box;
-  `;
-
-  // Create suggestions container
-  mobilePlaylistSuggestions = document.createElement("div");
-  mobilePlaylistSuggestions.id = "mobilePlaylistSuggestions";
-  mobilePlaylistSuggestions.style.cssText = `
-    margin-top: 8px;
-    padding: 8px;
-    background: white;
-    border-radius: 4px;
-    border: 1px solid #ddd;
-    font-size: 14px;
-    color: #666;
-    display: none;
-  `;
-
-  // Create apply button
-  const applyBtn = document.createElement("button");
-  applyBtn.textContent = "Apply Filter";
-  applyBtn.style.cssText = `
-    width: 100%;
-    margin-top: 8px;
-    padding: 10px;
-    background: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 16px;
-    cursor: pointer;
-  `;
-
-  // Append elements
-  filterContainer.appendChild(mobilePlaylistInput);
-  filterContainer.appendChild(mobilePlaylistSuggestions);
-  filterContainer.appendChild(applyBtn);
-
-  // Insert after playList element
-  const mainElement = document.querySelector("main");
-  if (mainElement && playList) {
-    mainElement.insertBefore(filterContainer, playList.parentElement);
-  } else if (mainElement) {
-    mainElement.insertBefore(filterContainer, mainElement.firstChild);
-  }
-
-  // Event listeners
-  mobilePlaylistInput.addEventListener("input", function () {
-    updateMobilePlaylistSuggestions(this.value);
-  });
-
-  mobilePlaylistInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") {
-      applyMobilePlaylistFilter();
-    }
-  });
-
-  applyBtn.addEventListener("click", applyMobilePlaylistFilter);
-
-  // Show filter on mobile only
-  if (window.innerWidth <= 768) {
-    filterContainer.style.display = "block";
-  }
-
-  // Handle responsive visibility
-  window.addEventListener("resize", function () {
-    filterContainer.style.display = window.innerWidth <= 768 ? "block" : "none";
-  });
-}
-
-function updateMobilePlaylistSuggestions(input) {
-  if (!input.trim()) {
-    mobilePlaylistSuggestions.style.display = "none";
-    return;
-  }
-
-  const suggestions = [];
-  const lowerInput = input.toLowerCase();
-
-  // Check if input is numeric
-  const isNumeric = /^[\d,\-\s]*$/.test(input);
-
-  if (isNumeric) {
-    suggestions.push("📋 Numbers detected: Will create playlist from: " + input);
-  } else {
-    // Search for matching keywords
-    const matches = [];
-    Sentences.forEach((sentence, idx) => {
-      if (
-        (sentence.english && sentence.english.toLowerCase().includes(lowerInput)) ||
-        (sentence.arabic && sentence.arabic.toLowerCase().includes(lowerInput)) ||
-        (sentence.keyWord && sentence.keyWord.toLowerCase().includes(lowerInput))
-      ) {
-        matches.push(idx + 1); // 1-indexed for display
-      }
-    });
-
-    if (matches.length === 0) {
-      suggestions.push("❌ No matches found for: \"" + input + "\"");
-    } else {
-      suggestions.push("✅ Found in clips: " + matches.join(", "));
-    }
-  }
-
-  mobilePlaylistSuggestions.innerHTML = suggestions.join("<br>");
-  mobilePlaylistSuggestions.style.display = "block";
-}
-
-function applyMobilePlaylistFilter() {
-  const inputValue = mobilePlaylistInput.value.trim();
-
-  if (!inputValue) {
-    alert("Please enter a word, numbers, or range to filter.");
-    return;
-  }
-
-  // Set the desktop playlist input to the same value
-  playList.value = inputValue;
-
-  // Enable playlist mode
-  usePlayListCheckbox.checked = true;
-  enablePlaylistMode();
-
-  // Clear input
-  mobilePlaylistInput.value = "";
-  mobilePlaylistSuggestions.style.display = "none";
 }
 
 // ========== SCRAMBLE FUNCTION ==========
@@ -309,7 +151,10 @@ speakScrambledCheckbox.addEventListener("change", function () {
   }
 });
 
+
+
 function seqRange(input) {
+
   let seq = input.split("-")[0];
   seq = seq.split(",").map(Number);
 
@@ -321,26 +166,45 @@ function seqRange(input) {
   const combined = [...seq, ...rnge];
 
   return [...new Set(combined)];
+    
 }
 
 // ========== LOOKUP TEXT FUNCTION ==========
-function lookupText(txt) {
-  const numScripts = [];
-  const re = new RegExp(`\\b${txt}\\b`);
 
-  for (const [i, sentence] of Sentences.entries()) {
-    if (re.test(sentence.english.toLowerCase())) {
-      numScripts.push(i);
-    }
-  }
-  
-  if (numScripts.length === 0) {
-    alert("There aren't any scripts that contain this keyword ");
-    return "alert";
-  }
+// takes the sentence(dct) from the scripts and compares each word in it to the keyword(chk) to double check 
+// function doubleCheck(dct, chk) {
+//     const words = dct.split(" ");
 
-  return numScripts;
+//     for (const word of words) {
+//         if (word === chk) {
+//             return true;
+//         }
+//     }
+
+//     return false;
+// }
+
+  function lookupText(txt) {
+    const numScripts = [];
+    const re = new RegExp(`\\b${txt}\\b`);
+
+
+    for (const [i, sentence] of Sentences.entries()) {
+      
+      if (re.test(sentence.english.toLowerCase())){        
+        numScripts.push(i);
 }
+    };
+    if (numScripts.length === 0){
+      //console.log("none is found")
+      alert("There aren't any scripts that contain this keyword ")
+      return "alert"
+    }
+     
+    return numScripts;
+     
+}
+
 
 // ========== PLAYLIST MODE FUNCTIONS ==========
 function buildDefaultNav() {
@@ -349,25 +213,29 @@ function buildDefaultNav() {
   usePlayListMode = false;
 }
 
+// creating an array from the user's input (in the case a hyphen is used)
 function range(start, end) {
-  return Array.from(
-    { length: end - start + 1 },
-    (_, i) => start + i
-  );
+    return Array.from(
+        { length: end - start + 1 },
+        (_, i) => start + i
+    );
 }
 
 function parsePlayListInput(text) {
+  
   const indices = [];
   const seen = new Set();
 
   if (!text) return [];
-  else if (text.includes("-") && text.includes(",")) {
-    return seqRange(text);
-  } else if (text.includes("-")) {
+  
+  else if (text.includes("-") && text.includes(",")){
+    return seqRange(text)
+  }
+  else if (text.includes("-")) {
     var tokens = text.split("-").map(t => t.trim()).filter(Boolean);
 
     let start = parseInt(tokens[0], 10);
-    if (start === 0) {
+    if (start === 0){
       start = 1;
     }
     let end = parseInt(tokens[1], 10);
@@ -375,36 +243,41 @@ function parsePlayListInput(text) {
     if (start > end || start === end) {
       alert("the starting range shouldn't be smaller or equal than the end parameter, recheck the provided range");
       return 'alert';
-    }
+    };
 
-    return range(start - 1, end - 1);
-  } else if (text.includes(",")) {
+  return range(start - 1, end - 1);
+    
+} else if (text.includes(",")) {
     var tokens = text.split(",").map(t => t.trim()).filter(Boolean);
 
-    tokens.forEach(tok => {
-      const n = parseInt(tok, 10);
-      if (!Number.isFinite(n)) return;
+    
+  tokens.forEach(tok => {
+    const n = parseInt(tok, 10);
+    if (!Number.isFinite(n)) return;
 
-      const idx = n - 1;
-      if (idx < 0 || idx >= Sentences.length) return;
+    const idx = n - 1;
+    if (idx < 0 || idx >= Sentences.length) return;
 
-      if (!seen.has(idx)) {
-        seen.add(idx);
-        indices.push(idx);
-      }
-    });
+    if (!seen.has(idx)) {
+      seen.add(idx);
+      indices.push(idx);
+    }
+  });
 
-    return indices;
-  } else if (typeof text === "string") {
-    console.log("got a string");
-    return lookupText(text.toLowerCase());
+  return indices;
+}else if (typeof text === "string"){
+  console.log("got a string");
+  return lookupText(text.toLowerCase());
   }
+  
+
+  
 }
 
 function enablePlaylistMode() {
   const indices = parsePlayListInput(playList.value);
 
-  if (indices.length === 0 || indices === 'alert') {
+  if (indices.length === 0 || !'alert') {
     usePlayListCheckbox.checked = false;
     alert("Playlist is empty or invalid. Enter numbers like: 1, 3, 5");
     return;
@@ -566,7 +439,6 @@ function resetDetails() {
   answerDetails.open = false;
   illustrationDetails.open = false;
 }
-
 function scrollToTop() {
   document.querySelector("main").scrollTo({
     top: 0,
@@ -672,5 +544,4 @@ document.addEventListener("touchend", function (e) {
     prevSentence();
   }
 });
-
 loadData();
