@@ -49,8 +49,11 @@ const speakingIndicator = document.getElementById("speakingIndicator");
 
 // ========== LOAD DATA FROM JSON ==========
 async function loadData() {
+  const audio_file = 'Intro_ls0_unit_1_audio.json'
+  
   try {
-    const response = await fetch('Intro_ls0_unit_1_audio.json');
+    const response = await fetch(audio_file);
+    
     const data = await response.json();
 
     // ── NEW: read title from JSON root ──────────────────────────────
@@ -65,8 +68,9 @@ async function loadData() {
     buildDefaultNav();
     displayData();
   } catch (error) {
-    console.error('Error loading data_01.json:', error);
-    alert('Failed to load lesson data. Please check that data_01.json exists.');
+    
+    console.error(`Error loading ${audio_file}:`, error);
+    alert(`Failed to load lesson data. Please check that ${audio_file} exists.`);
   }
 }
 
@@ -311,8 +315,9 @@ playList.addEventListener("keydown", function (e) {
   }
 });
 
-// ========== SPEAK BUTTONS ==========
+// ========== SPEAK BUTTONS ========== tts
 speakEnglishBtn.addEventListener("click", function () {
+  console.log("current audio index: " + currentAudioIndex)
   const s = Sentences[currentAudioIndex];
   if (s && s.english && s.english.trim()) {
     const cleanedText = s.english.replace(/<br\s*\/?>/gi, " ");
@@ -372,14 +377,20 @@ stopBtn.addEventListener("click", function () {
 function updateButtonState() {
   prevBtn.disabled = navPos === 0;
   nextBtn.disabled = navPos === navIndices.length - 1;
+  
 }
 
+let userPressedPlay = false;
+
 function displayData() {
+  document.getElementById("ttsFallbackBtn").style.display = "none";
   if (navPos < 0) navPos = 0;
   if (navPos > navIndices.length - 1) navPos = navIndices.length - 1;
 
   currentAudioIndex = navIndices[navPos];
   const s = Sentences[currentAudioIndex];
+  userPressedPlay = false;
+  
 
   q.textContent =
     (navPos + 1) + "/" + navIndices.length +
@@ -399,8 +410,36 @@ function displayData() {
   def.innerHTML = s.definition || "";
   english.innerHTML = s.english || "";
   arabic.innerHTML = s.arabic || "";
-  audio.src = s.audio || "";
+  // Check if audio file exists BEFORE setting src
+  if (s.audio && s.audio.trim() && s.audio !== ".jpg") {
+      // Try to check if file exists (optional)
+      fetch(s.audio, { method: 'HEAD' })
+          .then(response => {
+              if (response.ok) {
+                  console.log("✅ Audio file exists:", s.audio);
+                  audioElement.src = s.audio;
+                  audioElement.style.display = "block";
+              } else {
+                  console.warn("⚠️ Audio file NOT FOUND:", s.audio, "Status:", response.status);
+                  audioElement.src = "";
+                  // The error event will handle the fallback
+              }
+          })
+          .catch(error => {
+              console.warn("⚠️ Could not check audio file:", error);
+              audioElement.src = s.audio || ""; // Let the error event handle it
+          });
+  } else {
+      console.log("ℹ️ No audio file specified for this clip");
+      audioElement.src = "";
+      audioElement.style.display = "none";
+       // Shows a TTS button instead
+      document.getElementById("ttsFallbackBtn").style.display = "inline-block";
+      // Don't fallback here - let play event handle it
+  }
+
   audio.load();
+  console.log(`audio name: ${audio.src}`) //audio console
   answer.innerHTML = s.answer || "";
 
   scrambledText.textContent = "";
@@ -431,6 +470,11 @@ function displayData() {
 
   updateButtonState();
 }
+
+document.getElementById("ttsFallbackBtn").addEventListener("click", function() {
+    userPressedPlay = true;
+    fallbackToTTS();
+});
 
 function resetDetails() {
   definitionDetails.open = false;
@@ -515,7 +559,9 @@ audioIndexInput.addEventListener("keydown", function (e) {
 
 document.addEventListener("keydown", function (e) {
   if (e.key === "ArrowRight") nextSentence();
+  
   if (e.key === "ArrowLeft") prevSentence();
+  
 });
 
 function updateSpeakingUI() {
@@ -544,4 +590,158 @@ document.addEventListener("touchend", function (e) {
     prevSentence();
   }
 });
+
+
+const audioElement = document.getElementById("audio");
+
+// 1. INTERCEPT PLAY ATTEMPTS (handles empty/invalid src)
+audioElement.addEventListener("play", function() {
+    console.log("🎵 Play event triggered");
+    console.log("📁 Current audio src:", audio.src);
+
+    userPressedPlay = true;
+    
+    // Check if there's a valid source
+    const hasValidSrc = audioElement.src && 
+                       audioElement.src !== "" && 
+                       audioElement.src !== window.location.href &&
+                       !audioElement.src.endsWith("/"); // Prevent empty directory paths
+    
+    if (!hasValidSrc) {
+        console.log("⚠️ No valid audio source! Falling back to TTS...");
+        audioElement.pause();
+        fallbackToTTS();
+    }
+});
+
+// 2. HANDLE LOADING ERRORS (handles missing files, 404 errors, network issues)
+audioElement.addEventListener("error", function(e) {
+    console.log("❌ Audio error event triggered!");
+    console.log("📁 Failed src:", audioElement.src);
+    console.log("🔍 Error code:", audioElement.error ? audioElement.error.code : "Unknown");
+    console.log("🔍 Error message:", audioElement.error ? audioElement.error.message : "Unknown");
+    document.getElementById("ttsFallbackBtn").style.display = "inline-block";
+    audioElement.style.display = "none";
+    
+    // Different error codes:
+    // 1 = MEDIA_ERR_ABORTED (user canceled)
+    // 2 = MEDIA_ERR_NETWORK (network error)
+    // 3 = MEDIA_ERR_DECODE (corrupted file)
+    // 4 = MEDIA_ERR_SRC_NOT_SUPPORTED (file not found or unsupported)
+    
+    if (audioElement.error && audioElement.error.code === 4) {
+        console.log("📁 File not found or unsupported format!");
+    }
+    
+    if (userPressedPlay) {
+        console.log("🔊 User pressed play, falling back to TTS...");
+        fallbackToTTS();
+    } else {
+        console.log("ℹ️ Audio error occurred but user didn't press play - ignoring");
+    }
+});
+
+
+audioElement.addEventListener("loadeddata", function() {
+    console.log("✅ Audio loaded successfully!");
+    clearTimeout(loadTimeout);
+});
+
+// 4. HANDLE PLAYBACK FAILURE (if play() is called and fails)
+audioElement.addEventListener("stalled", function() {
+    console.log("⚠️ Audio stalled - playback is failing!");
+    // Could fallback here if needed
+});
+
+
+
+
+// ========== COMMON FALLBACK FUNCTION ==========
+function fallbackToTTS() {
+    console.log("🔊 Falling back to TTS for clip:", currentAudioIndex);
+    
+    // Cancel any ongoing TTS
+    speechSynthesis.cancel();
+    
+    const s = Sentences[currentAudioIndex];
+    if (s && s.english && s.english.trim()) {
+        const cleanedText = s.english.replace(/<br\s*\/?>/gi, " ");
+        
+        // Create new utterance
+        const utterance = new SpeechSynthesisUtterance(cleanedText);
+        utterance.lang = "en-US";
+        utterance.rate = 0.9; // Slightly slower for better comprehension
+        utterance.pitch = 1;
+        utterance.volume = 1;
+        
+        utterance.onstart = function() {
+            isSpeaking = true;
+            updateSpeakingUI();
+            console.log("🔊 TTS started speaking");
+        };
+        
+        utterance.onend = function() {
+            isSpeaking = false;
+            updateSpeakingUI();
+            console.log("🔊 TTS finished speaking");
+        };
+        
+        utterance.onerror = function(e) {
+            console.error("🔊 TTS error:", e);
+            isSpeaking = false;
+            updateSpeakingUI();
+        };
+        
+        speechSynthesis.speak(utterance);
+    } else {
+        console.warn("⚠️ No English text available for TTS fallback!");
+    }
+}
+
+
+// const audioElement = document.getElementById("audio");
+
+// // Listen for the 'play' event on the audio element
+// audioElement.addEventListener("play", function() {
+//     // Check if there's no audio source or if the src is empty
+//     if (!audioElement.src || audioElement.src === "" || audioElement.src === window.location.href) {
+//         // Cancel audio playback
+//         audioElement.pause();
+        
+//         // Call TTS function to speak the English text instead
+//         const s = Sentences[currentAudioIndex];
+//         if (s && s.english && s.english.trim()) {
+//             const cleanedText = s.english.replace(/<br\s*\/?>/gi, " ");
+//             utterance.text = cleanedText;
+//             utterance.lang = "en-US";
+//             speechSynthesis.cancel();
+//             speechSynthesis.speak(utterance);
+//             isSpeaking = true;
+//             updateSpeakingUI();
+//             utterance.onend = function () {
+//                 isSpeaking = false;
+//                 updateSpeakingUI();
+//             };
+//         }
+//     }
+// });
+
+// // Also handle the case where the audio fails to load
+// audioElement.addEventListener("error", function() {
+//     // If audio fails to load, fallback to TTS
+//     const s = Sentences[currentAudioIndex];
+//     if (s && s.english && s.english.trim()) {
+//         const cleanedText = s.english.replace(/<br\s*\/?>/gi, " ");
+//         utterance.text = cleanedText;
+//         utterance.lang = "en-US";
+//         speechSynthesis.cancel();
+//         speechSynthesis.speak(utterance);
+//         isSpeaking = true;
+//         updateSpeakingUI();
+//         utterance.onend = function () {
+//             isSpeaking = false;
+//             updateSpeakingUI();
+//         };
+//     }
+// });
 loadData();
